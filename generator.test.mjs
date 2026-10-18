@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {people,moods,genres,voices,generateSong,hideNames,validate} from './generator.mjs';
+const input=p=>({person:p.name,country:p.country,era:p.era,clues:p.clues,mood:moods[0],genre:genres[0],voice:voices[0]});
+test('20 people, every style, all three clues retained, no answer in lyrics or prompt',()=>{assert.equal(people.length,20);for(const p of people)for(const mood of moods)for(const genre of genres)for(const voice of voices){const song=generateSong({...input(p),mood,genre,voice});for(const text of [song.lyrics,song.prompt]){assert.ok(!text.includes(p.name));for(const clue of p.clues)assert.ok(text.includes(hideNames(clue)));}assert.ok(song.style.includes(voice));}});
+test('removes names, aliases, spaces, zero-width and names in era or clues',()=>{const p=people[0];const song=generateSong({...input(p),country:'세 종 대 왕의 나라',era:'세\u200b종 시대',clues:['세종대왕은 한글을 만들었어요','이도는 백성을 생각했어요','세 종은 과학을 지원했어요']});assert.ok(!/세종|세 종|이도/.test(song.lyrics));assert.equal(hideNames('충무공 이순신'),'그 사람 그 사람');});
+test('rejects missing person, missing or duplicate clues, invalid style',()=>{const base=input(people[0]);for(const bad of [{person:null},{country:''},{era:''},{clues:['한 가지']},{clues:['같은 업적','같은 업적','다른 업적']},{genre:'invalid'}])assert.ok(validate({...base,...bad}));});
+test('alternate lyrics differ',()=>{assert.notEqual(generateSong(input(people[0]),0).lyrics,generateSong(input(people[0]),1).lyrics);});
