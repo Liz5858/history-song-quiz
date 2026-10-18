@@ -42,28 +42,68 @@ export function validate(input){
  if(new Set(input.clues.map(c=>c.trim())).size!==3)return '서로 다른 업적 세 가지를 적어줘.';
  return '';
 }
-export function generateSong(input, version=0){
- const error=validate(input); if(error)throw new Error(error);
- const [one,two,three]=input.clues.map(c=>hideNames(c.trim()).replace(/[.!?。]+$/u,''));
+// Eight distinct story worlds plus seeded variation of structure, phrases and clue order.
+const worlds = [
+ ['시간 열차','칙칙폭폭, 시간을 건너','옛날로 가는 표 한 장을 손에 쥐고','다음 역은 어디일까, 귀를 기울여','덜컹덜컹 기억의 선로 위로','창밖에 지나가는 힌트를 잡아봐','종착역에 도착하면 내 이름을 말해줘'],
+ ['역사 탐정','돋보기를 들고, 수사를 시작해','책장 사이에 숨은 단서를 찾아','누구의 발자국일까, 하나씩 맞춰봐','조각조각 모인 증거가 말을 해','정답은 네 추리 속에 숨어 있어','탐정님, 이제 사건을 해결해 줘'],
+ ['별빛 편지','먼 시간 너머에서 편지가 왔어','이름 없는 봉투를 살며시 열어봐','어떤 사람이 보낸 마음일까','별빛을 따라 한 줄씩 읽어봐','세 이야기가 하나의 별이 될 때','편지의 주인에게 답장을 보내줘'],
+ ['비밀 미션','비밀 미션, 준비됐니?','역사의 문을 여는 암호를 찾아','두근두근, 암호를 풀어봐','힌트를 연결해 문을 열어봐','마지막 열쇠는 네가 알고 있어','미션 완료! 주인공을 외쳐줘'],
+ ['시간 속 전시관','조용한 전시관에 불이 켜지면','옛이야기들이 하나씩 깨어나','이야기의 주인공을 찾아줄래','멈춰 있던 장면을 노래로 이어','기억의 빈자리를 네가 채워줘','이 전시의 마지막 이름표를 써줘'],
+ ['퀴즈 무대','커튼이 열리고 조명이 켜져','이름 대신 이야기로 인사할게','누구일까, 다 같이 맞혀봐','이 무대의 주인공을 불러줘','세 가지 이야기, 하나의 정답','박수와 함께 정답을 들려줘'],
+ ['기억의 퍼즐','흩어진 퍼즐을 책상에 펼쳐','하나하나 이어서 그림을 그려','어떤 얼굴이 떠오르니','이야기를 맞추면 길이 보여','세 조각이 만나는 바로 그곳','완성된 그림의 주인공을 말해줘'],
+ ['책 속 숨바꼭질','꼭꼭 숨어라, 이름은 비밀','책장을 넘기며 나를 찾아봐','어디 어디 숨었을까','글자 사이에 힌트가 반짝','모두 찾았다면 손을 들어봐','술래야, 내 이름을 맞혀줄래']
+];
+const genreSpec = {
+ '🎤 K-pop': ['Korean dance pop','bright synth plucks, bouncy bass, crisp drums',['반짝이는 리듬을 따라','발끝으로 그려보는 이야기','두근대는 비트 사이로','함께 부를 멜로디 속에'],[108,116,124]],
+ '🎧 힙합 / 랩': ['melodic hip-hop with rhythmic rap verses','rounded bass, boom-bap drums, piano stabs',['박자를 쪼개, 단서를 꺼내','한 줄 한 줄 이어지는 라임','비트 위에 올라탄 이야기','리듬을 타고 집중해 봐'],[84,92,100]],
+ '🎸 밴드 / 록': ['melodic pop rock','electric guitar riffs, live drums, warm bass',['기타 소리 타고 울려 퍼져','드럼처럼 두드리는 궁금증','힘껏 불러, 함께 들어봐','리듬에 실어 저 멀리 보내'],[112,124,132]],
+ '🎹 발라드': ['melodic Korean ballad','gentle piano, soft strings, subtle brushed drums',['마음 한쪽에 남아 있는 말','조용히 꺼내 보는 이야기','한 줄의 기억을 따라가면','오래도록 잊히지 않는 장면'],[68,76,84]],
+ '🪕 국악 퓨전': ['Korean traditional fusion pop','gayageum plucks, daegeum, janggu, modern bass',['얼쑤, 이야기를 풀어보세','장단 따라 귀를 기울여','좋구나, 함께 불러보세','덩기덕, 다음 이야기를 들어'],[88,100,112]],
+ '🎶 동요': ['playful sing-along children song','ukulele, glockenspiel, handclaps, light percussion',['작은 손으로 박수를 짝짝','또박또박 이야기를 해봐','동그랗게 모여 앉아서','친구들과 한 소절씩 불러'],[96,104,112]]
+};
+const moodSpec={
+ '☀️ 신나는':['cheerful, playful, energetic','밝게 웃으며 노래를 시작해','힘차고 가볍게 함께 불러봐'],
+ '🌷 따뜻한':['warm, tender, comforting','다정한 마음을 노래에 담아','포근한 멜로디를 너에게 전해'],
+ '🔥 웅장한':['majestic, cinematic, uplifting','깊게 울리는 노래를 들어봐','힘차게 번지는 목소리를 모아'],
+ '🌙 잔잔한':['calm, delicate, reflective','낮은 목소리로 이야기를 꺼내','고요한 멜로디에 귀를 기울여']
+};
+const voiceSpec={
+ '👧 맑은 여자 목소리':'clear, bright female lead vocal',
+ '👦 맑은 남자 목소리':'clear, gentle male lead vocal',
+ '👫 친구들과 합창':'youthful mixed choir, group unison with simple harmonies'
+};
+function randomSeed(){return globalThis.crypto?.getRandomValues(new Uint32Array(1))[0]??Math.floor(Math.random()*4294967296);}
+export function generateSong(input, version=randomSeed()){
+ const error=validate(input);if(error)throw new Error(error);
+ const seed=version>>>0;let state=(seed^0x9e3779b9)>>>0;
+ const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
+ const pick=items=>items[Math.floor(random()*items.length)];
+ const [theme,...lines]=worlds[seed%worlds.length];
+ const [genre,instruments,verseLines,tempos]=genreSpec[input.genre];
+ const [mood,...moodLines]=moodSpec[input.mood];
+ const clues=input.clues.map(c=>hideNames(c.trim()).replace(/[.!?。]+$/u,''));
+ // Fisher-Yates retains every fact, with no invented historical claims.
+ for(let i=clues.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[clues[i],clues[j]]=[clues[j],clues[i]];}
  const home=hideNames(input.country.trim()),era=hideNames(input.era.trim());
- const moodLines={
-  '☀️ 신나는':['손뼉을 짝짝, 시간 여행 출발!','반짝이는 힌트 따라 함께 뛰어봐'],
-  '🌷 따뜻한':['작은 이야기 하나 마음에 담아','다정한 바람처럼 너에게 전할게'],
-  '🔥 웅장한':['힘차게 울려라, 역사의 발걸음','오래된 시간 너머 이야기가 깨어나'],
-  '🌙 잔잔한':['고요한 밤, 책장을 넘기면','별빛 같은 이야기가 조용히 들려와']
- };
- const hooks=[['나는 누구, 누구일까요?','세 가지 힌트를 이어봐요','이름은 아직 비밀이에요','역사 속 나를 찾아봐요'],['누굴까, 누굴까, 생각해 봐','시간 속 발자국을 따라가 봐','하나, 둘, 셋, 힌트를 모아','네 마음속 정답을 외쳐봐']][version%2];
- let verse;
- switch(input.genre){
-  case '🎧 힙합 / 랩': verse=`[Verse 1 · 리듬을 타며]\n첫 번째 힌트, 들어봐 yo!\n${one}\n두 번째 힌트, 이어가 flow!\n${two}`;break;
-  case '🎸 밴드 / 록': verse=`[Verse 1 · 힘찬 기타와 함께]\n시간의 문을 열어, 크게 외쳐봐\n${one}\n울려 퍼지는 이야기, 함께 달려가\n${two}`;break;
-  case '🎹 발라드': verse=`[Verse 1 · 천천히 들려주듯]\n오래된 책장 사이로\n${one}\n기억의 길을 걸으며\n${two}`;break;
-  case '🪕 국악 퓨전': verse=`[Verse 1 · 장단에 맞춰]\n얼쑤, 첫 이야기를 풀어보세\n${one}\n좋구나, 두 번째 이야기도 들어보세\n${two}`;break;
-  case '🎶 동요': verse=`[Verse 1 · 또박또박 즐겁게]\n하나! 첫 번째 이야기\n${one}\n둘! 두 번째 이야기\n${two}`;break;
-  default: verse=`[Verse 1 · 통통 튀는 리듬]\n한 걸음 더, 내 이야기를 들어봐\n${one}\n두 걸음 더, 힌트를 따라와\n${two}`;
- }
- const lyrics=hideNames(`[Intro]\n${moodLines[input.mood][version%2]}\n${home}, ${era} 속으로!\n\n${verse}\n\n[Chorus · 함께 부르는 후렴]\n${hooks.join('\n')}\n\n[Verse 2 · 마지막 힌트]\n세 번째 이야기, 귀를 기울여 봐\n${three}\n서로 다른 세 힌트가 모이면\n책 속의 한 사람이 떠오를 거야\n\n[Chorus · 한 번 더!]\n${hooks.join('\n')}\n\n[Outro]\n이제 네 차례, 정답을 말해줘\n이 노래의 주인공은 누구일까요?`);
+ const intro=`[Intro]\n${pick(lines.slice(0,2))}\n${pick(moodLines)}`;
+ const place=pick([`${home}, ${era} 속으로`,`${era}, ${home}에서 시작된 이야기`,`${home}의 ${era}, 책장을 열어봐`]);
+ const verse1=`[Verse 1]\n${place}\n${clues[0]}\n${pick(verseLines)}\n${clues[1]}`;
+ const verse2=`[Verse 2]\n${pick(verseLines)}\n${clues[2]}\n${pick(['눈을 감고 그 모습을 그려봐','세 이야기가 한 사람을 가리켜','남겨진 이야기를 가만히 이어봐','여기까지 들었다면 떠올려봐'])}`;
+ const chorus=`[Chorus]\n${lines[2]}\n${lines[3]}\n${pick(['이름은 잠시 비워둘게','답은 아직 말하지 마','생각할 시간을 네게 줄게','너의 기억을 두드려봐'])}\n${lines[4]}`;
+ const pre=`[Pre-Chorus]\n${pick(['하나의 이야기가 다음 이야기로','조금씩 가까워지는 정답','모두 다른 장면이 만나면','잠깐, 힌트들을 연결해 봐'])}\n${pick(moodLines)}`;
+ const bridge=`[Bridge]\n${pick(['너와 내가 배운 시간 속에','책장과 책장 사이 어딘가에','우리의 기억을 모아 보면','작은 목소리들을 모아'])}\n${lines[4]}`;
+ const outro=`[Outro]\n${lines[5]}`;
+ const layout=Math.floor(seed/8)%4;
+ const blocks=[
+  [intro,verse1,pre,chorus,verse2,bridge,chorus,outro],
+  [chorus,verse1,verse2,pre,chorus,outro],
+  [intro,verse1,chorus,verse2,bridge,chorus,outro],
+  [intro,verse1,pre,verse2,chorus,bridge,outro]
+ ][layout];
+ const lyrics=hideNames(blocks.join('\n\n'));
  const style=`${input.mood} · ${input.genre} · ${input.voice}`;
- const prompt=hideNames(`초등학교 5~6학년용 역사 인물 퀴즈 노래를 만들어 주세요.\n스타일: ${style}\n인물 이름, 별명, 호, 정답을 제목·가사·소개·추임새 어디에도 쓰지 마세요. 새로운 역사적 사실을 덧붙이지 마세요. 입력 가사의 세 가지 업적과 나라·시대를 유지하고, 1분 내외로 친구들이 따라 부르기 쉽게 작곡해 주세요.\n\n제목: 나는 누구일까요?\n\n${lyrics}`);
- return {lyrics,style,prompt,answer:input.person};
+ const tempo=pick(tempos)+(input.mood==='🌙 잔잔한'?-8:input.mood==='☀️ 신나는'?4:0);
+ const arrangement=pick(['short instrumental opening, sparse verses, fuller chorus, clean ending','intimate verses, memorable sing-along chorus, gentle dynamic build','playful call-and-response accents, steady groove, strong final chorus','clear lead melody, light backing harmonies, brief instrumental transitions']);
+ const musicGuide=hideNames(`${genre}; ${mood}; ${tempo} BPM. Instruments: ${instruments}. Vocals: ${voiceSpec[input.voice]}, clear Korean pronunciation, comfortable range, easy melody for elementary students. Arrangement: ${arrangement}. Follow the supplied section tags and Korean lyrics exactly. Classroom history guessing song: keep the identity secret; do not add names, spoken introductions, new lyrics or historical facts. Vocals forward in the mix, short intro, no long solos.`);
+ return {lyrics,style,musicGuide,theme,answer:input.person};
 }
